@@ -6,6 +6,7 @@ import csv
 import time
 import datetime
 from tabulate import tabulate
+import os
 
 time_stamp = time.strftime("%Y%m%d_%H%M")
 script = 'eco_area_v2'
@@ -16,15 +17,19 @@ else:
     print 'spatial analyst extension unavailable'
 
 # Set workspace
-dir = 'W:/Visionmaker_validation/base_eco_statistics'
-arcpy.env.workspace = dir
+ROOT_DIR = os.path.join('D:\\', '_data', 'Visonmaker', 'Visionmaker_validation', 'base_ecosystem_summary')
+arcpy.env.workspace = ROOT_DIR
 arcpy.env.overwriteOutput = True
 
 # INPUTS
-base_ecosystems = 'W:/Visionmaker_validation/VM_base_ecosystems_1m_boroclp.tif'
-FAR = 'W:/Visionmaker_validation/VM_FAR_1m_boroclp.tif'
-#region_group = 'W:/Visionmaker_validation/base_eco_statistics/eco_count/10m_reggrp'
-resolution = raw_input('Enter Grid Resolution : ')
+INPUT_DIR = os.path.join(ROOT_DIR, 'inputs')
+BASE_ECOSYSTEMS = os.path.join(INPUT_DIR, 'VM_Final_baseecosystems_2015_10m.tif')
+FAR = os.path.join(INPUT_DIR, 'VM_Final_baseecosystems_FAR_2015_10m.tif')
+REGION_GROUP = os.path.join(INPUT_DIR, '10m_reggrp_v2')
+
+# raster_properties = arcpy.GetRasterProperties_management(BASE_ECOSYSTEMS, '')
+resolution = 10 #raster_properties.GetOutput(0)
+print resolution
 
 # list of all visonmaker ecosystem ids
 eco_ids = [1, 2, 3, 5, 6, 7, 8, 9, 10,
@@ -59,7 +64,7 @@ area = 'Count'
 
 
 # Set search cursor for base_ecosystem raster
-eco_cursor = arcpy.SearchCursor(base_ecosystems)
+eco_cursor = arcpy.SearchCursor(BASE_ECOSYSTEMS)
 
 print 'Calculating footprint area for each ecosystem'
 
@@ -72,27 +77,28 @@ for row in eco_cursor:
 
 # CALCULATE ECOSYSTEM COUNTS
 
-# Set search cursor for region_group raster
-# count_cursor = arcpy.SearchCursor(region_group)
-#
+# Set search cursor for REGION_GROUP raster
+count_cursor = arcpy.SearchCursor(REGION_GROUP)
+
 # print 'Calculating counts for each ecosystem'
 
 # Add counts to eco_summary
-# for row in count_cursor:
-#     if row.getValue('LINK') in eco_summary:
-#         eco_summary[row.getValue('LINK')]['count'] += 1
+for row in count_cursor:
+    if row.getValue('LINK') in eco_summary:
+        eco_summary[row.getValue('LINK')]['count'] += 1
 
 # CALCULATE FLOOR AREA
 print 'Calculating floor area for each ecosystem'
 
 # Subset FAR raster by ecosystem type
 for id in eco_summary:
-    eco_subset_path = (dir + '//eco_far//eco_far_' + str(id))
-    eco_subset = arcpy.sa.Con(arcpy.Raster(base_ecosystems) == id, arcpy.Raster(FAR), 0)
-    eco_subset.save(eco_subset_path)
+    eco_subset_path = os.path.join(ROOT_DIR , 'eco_far', 'eco_far_%s.tif' % id)
+    if arcpy.Exists(eco_subset_path) is False:
+        eco_subset = arcpy.sa.Con(arcpy.Raster(BASE_ECOSYSTEMS) == id, arcpy.Raster(FAR), 0)
+        eco_subset.save(eco_subset_path)
 
 # Get FAR subset grids
-arcpy.env.workspace = dir + '/eco_far'
+arcpy.env.workspace = os.path.join(ROOT_DIR,'eco_far')
 
 subset_grids = arcpy.ListRasters(raster_type = "GRID")
 
@@ -110,12 +116,12 @@ for subset_grid in subset_grids:
             bldg_area_per_far = row.getValue('Value') * row.getValue('Count')
             eco_summary[eco_id]['floor_area'] += (bldg_area_per_far * scalar)
 
-arcpy.env.workspace = dir
+arcpy.env.workspace = ROOT_DIR
 
 # OUTPUTS
 
 # Write to CSV
-csv_name = dir + '/eco_summary/' + time_stamp + '_eco_summary.csv'
+csv_name = ROOT_DIR + '/eco_summary/' + time_stamp + '_eco_summary.csv'
 out_csv = open(csv_name, "wb")
 writer = csv.DictWriter(out_csv, fieldnames=['id', 'count', 'area', 'floor_area'])
 
@@ -136,15 +142,15 @@ out_csv.close()
 # 3) List of input grid paths
 # 4) Ecosystem summary table (count, area, floor area)
 
-txt_name = dir + '/eco_summary/' + time_stamp + '_eco_summary.txt'
+txt_name = os.path.join(ROOT_DIR, 'eco_summary', '%s_eco_summary.txt' % time_stamp)
 out_text = open(txt_name, 'w')
 out_text.write('Base Ecosystem Summary Details \n \n')
 out_text.write('Script : %r \n' % script)
-out_text.write(str(datetime.datetime.now()) + ('\n \n'))
+out_text.write(str(datetime.datetime.now()) + '\n \n')
 out_text.write('INPUTS \n')
-out_text.write('Base Ecosystem Raster : %r \n' % base_ecosystems)
+out_text.write('Base Ecosystem Raster : %r \n' % BASE_ECOSYSTEMS)
 out_text.write('FAR Raster : %r \n' % FAR)
-# out_text.write('Region Group Raster : %r \n' % region_group)
+out_text.write('Region Group Raster : %r \n' % REGION_GROUP)
 out_text.write('Grid Resolution : %r m sq \n \n' % str(resolution))
 
 rows = []
