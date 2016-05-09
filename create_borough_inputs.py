@@ -1,11 +1,8 @@
 import arcpy
 import arcpy.sa
-import csv
 import time
-import datetime
-from tabulate import tabulate
 import os
-import re
+
 
 
 time_stamp = time.strftime("%Y%m%d_%H%M")
